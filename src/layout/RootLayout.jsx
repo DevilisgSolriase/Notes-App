@@ -1,8 +1,10 @@
-export default function RootLayout({ children }) {
+import { Link, Outlet } from "react-router-dom";
+
+export default function RootLayout() {
   return (
     <div className="font-serif text-gray-300 min-h-screen flex flex-col">
       {/* Header */}
-      <header className="bg-gray-900 min-h-[80px] flex items-center text-white z-50 px-4">
+      <header className="bg-gray-900 min-h-[80px] flex items-center text-white z-50 px-4 gap-6">
         <div className="text-3xl font-bold flex-none">Notes App</div>
 
         <div className="flex-grow flex justify-center px-4">
@@ -15,11 +17,19 @@ export default function RootLayout({ children }) {
           </div>
         </div>
 
-        <div className="text-3xl font-bold flex-none">Notes App</div>
+        {/* Navigation */}
+        <nav className="flex gap-4 flex-none">
+          <Link to="/">Home</Link>
+          <Link to="/login">Login</Link>
+          <Link to="/register">Register</Link>
+          <Link to="/new_note">New Note</Link>
+        </nav>
       </header>
 
       {/* Page content */}
-      <div className="flex-1">{children}</div>
+      <main className="flex-1">
+        <Outlet />
+      </main>
     </div>
-  )
+  );
 }
