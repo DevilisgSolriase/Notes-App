@@ -1,6 +1,22 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { signOut } from "aws-amplify/auth";
+import { useAuth } from "../context/AuthContext";
 
 export default function RootLayout() {
+  const navigate = useNavigate();
+  const { user, setUser } = useAuth();
+
+  async function handleLogout() {
+    try {
+      await signOut();
+      setUser(null);
+      navigate('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  }
+
   return (
     <div className="font-serif text-gray-300 min-h-screen flex flex-col">
       {/* Header */}
@@ -20,9 +36,17 @@ export default function RootLayout() {
         {/* Navigation */}
         <nav className="flex gap-4 flex-none">
           <Link to="/">Home</Link>
-          <Link to="/login">Login</Link>
-          <Link to="/register">Register</Link>
-          <Link to="/new_note">New Note</Link>
+          {user ? (
+            <>
+              <Link to="/new_note">New Note</Link>
+              <button onClick={handleLogout} className="text-white hover:text-gray-300">Logout</button>
+            </>
+          ) : (
+            <>
+              <Link to="/login">Login</Link>
+              <Link to="/register">Register</Link>
+            </>
+          )}
         </nav>
       </header>
 
