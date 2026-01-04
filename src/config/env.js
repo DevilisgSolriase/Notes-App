@@ -1,3 +1,3 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+export const API_BASE_URL = 'https://j2ckqcb0bd.execute-api.eu-central-1.amazonaws.com/prod/';
 
 console.log("API_BASE_URL =", API_BASE_URL);

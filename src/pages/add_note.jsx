@@ -1,14 +1,23 @@
 import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { createNote } from '../api/notesApi'
 
 
 function AddNote() {
-
+  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    console.log({ title, content });
+    console.log('Submitting note:', { title, content });  // Debug log
+    try {
+      await createNote({ title, content });
+      console.log('Note created successfully');  // Debug log
+      navigate('/');
+    } catch (err) {
+      console.error('Failed to create note:', err);
+    }
   }
 
   return (

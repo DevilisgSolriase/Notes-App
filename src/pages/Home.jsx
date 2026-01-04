@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../api/client'
+import { getNotes, deleteNote } from '../api/notesApi'
 
 function Home() {
+  const navigate = useNavigate();
   const [showShadow, setShowShadow] = useState(true)
   const scrollRef = useRef(null)
   const [notes, setNotes] = useState([]);
@@ -12,18 +15,30 @@ function Home() {
   }
 
   async function fetchNotes() {
-    const res = await fetch("API_URL/notes");
-    const data = await res.json();
-    setNotes(data);
+    console.log('Fetching notes...');
+    try {
+      const data = await getNotes();
+      console.log('Fetched notes:', data);
+      setNotes(data);
+    } catch (err) {
+      console.error('Failed to fetch notes:', err);
+    }
   }
 
-  useEffect(() => {
-    fetchNotes();
-  }, []);
+  async function handleEdit(noteId) {
+    navigate(`/edit_note/${noteId}`);
+  }
 
-  useEffect(() => {
-    apiFetch('/test').catch(() => {})
-  }, [])
+  async function handleDelete(noteId) {
+    if (window.confirm('Are you sure you want to delete this note?')) {
+      try {
+        await deleteNote(noteId);
+        fetchNotes(); // Refresh the list
+      } catch (err) {
+        console.error('Failed to delete note:', err);
+      }
+    }
+  }
 
   return (
     <main className="flex h-full">
@@ -46,8 +61,17 @@ function Home() {
 
         <div ref={scrollRef} onScroll={handleScroll} className="w-full max-h-[450px] bg-gray-900 rounded-xl px-6 pt-6 mb-6 overflow-y-scroll hide-scrollbar relative">
           {notes.map((note) => (
-            <div key={note.id} className="mb-4">
-              <p className="text-gray-300">{note.content}</p>
+            <div key={note.noteId} className="mb-4 p-4 bg-gray-800 rounded-lg">
+              <h3 className="text-xl font-bold mb-2">{note.title}</h3>
+              <p className="text-gray-300 mb-4">{note.content}</p>
+              <div className="flex gap-2">
+                <button onClick={() => handleEdit(note.noteId)} className="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded">
+                  Edit
+                </button>
+                <button onClick={() => handleDelete(note.noteId)} className="bg-red-700 hover:bg-red-800 px-3 py-1 rounded">
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
           {showShadow && (
@@ -55,14 +79,6 @@ function Home() {
           )}
         </div>
 
-        <div className="flex justify-end gap-4">
-          <button className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-xl shadow-lg">
-            Edit
-          </button>
-          <button className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-xl shadow-lg">
-            Delete
-          </button>
-        </div>
       </div>
     </main>
   )
