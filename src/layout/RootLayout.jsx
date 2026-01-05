@@ -22,15 +22,11 @@ export default function RootLayout() {
       {/* Header */}
       <header className="bg-gray-900 min-h-[80px] flex items-center text-white z-50 px-4 gap-6">
         <div className="text-3xl font-bold flex-none">Notes App</div>
-
-      
-
         {/* Navigation */}
-        <nav className="flex gap-4 flex-none justify-end flex-1">
+        <nav className="flex gap-4 flex-none justify-end flex-1 ml-auto p-2">
           <Link to="/">Home</Link>
           {user ? (
             <>
-              <Link to="/new_note">New Note</Link>
               <button onClick={handleLogout} className="text-white hover:text-gray-300">Logout</button>
             </>
           ) : (

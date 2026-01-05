@@ -1,100 +1,111 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  PutItemCommand,
-  GetItemCommand,
+  DynamoDBDocumentClient,
+  PutCommand,
   QueryCommand,
-  UpdateItemCommand,
-  DeleteItemCommand
-} from "@aws-sdk/client-dynamodb";
+  UpdateCommand,
+  DeleteCommand,
+} from "@aws-sdk/lib-dynamodb";
+import crypto from "crypto";
 
 const client = new DynamoDBClient({ region: "eu-central-1" });
+const ddb = DynamoDBDocumentClient.from(client);
 
-const TABLE = "Notes";
+const TABLE_NAME = "Notes";
 
 export const handler = async (event) => {
-  const userId = event.requestContext.authorizer.jwt.claims.sub;
-  const method = event.httpMethod;
-  const noteId = event.pathParameters?.id;
-
   try {
-    if (method === "GET") {
-      if (noteId) {
-        // Get single note
-        const data = await client.send(new GetItemCommand({
-          TableName: TABLE,
-          Key: { UserID: { S: userId }, noteId: { S: noteId } }
-        }));
-        return ok(data.Item);
-      } else {
-        // List all notes
-        const data = await client.send(new QueryCommand({
-          TableName: TABLE,
-          KeyConditionExpression: "UserID = :uid",
-          ExpressionAttributeValues: { ":uid": { S: userId } }
-        }));
-        return ok(data.Items);
+    const claims = event.requestContext?.authorizer?.jwt?.claims;
+    if (!claims?.sub) {
+      return { statusCode: 401, body: "Unauthorized" };
+    }
+
+    const userId = claims.sub;
+    const route = event.requestContext.routeKey;
+    const body = event.body ? JSON.parse(event.body) : null;
+    const noteId = event.pathParameters?.id;
+
+    switch (route) {
+      // GET /notes
+      case "GET /notes": {
+        const result = await ddb.send(
+          new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: "UserID = :uid",
+            ExpressionAttributeValues: { ":uid": userId },
+          })
+        );
+        return { statusCode: 200, body: JSON.stringify(result.Items || []) };
       }
-    }
 
-    if (method === "POST") {
-      const body = JSON.parse(event.body);
-      const noteId = crypto.randomUUID();
-      const item = {
-        UserID: { S: userId },
-        noteId: { S: noteId },
-        title: { S: body.title },
-        content: { S: body.content },
-        createdAt: { S: new Date().toISOString() },
-        updatedAt: { S: new Date().toISOString() }
-      };
-
-      await client.send(new PutItemCommand({ TableName: TABLE, Item: item }));
-      return ok({ noteId, ...body });
-    }
-
-    if (method === "PUT") {
-      const body = JSON.parse(event.body);
-      await client.send(new UpdateItemCommand({
-        TableName: TABLE,
-        Key: { UserID: { S: userId }, noteId: { S: noteId } },
-        UpdateExpression: "SET title=:t, content=:c, updatedAt=:u",
-        ExpressionAttributeValues: {
-          ":t": { S: body.title },
-          ":c": { S: body.content },
-          ":u": { S: new Date().toISOString() }
+      // GET /notes/{id}
+      case "GET /notes/{id}": {
+        const result = await ddb.send(
+          new QueryCommand({
+            TableName: TABLE_NAME,
+            KeyConditionExpression: "UserID = :uid AND NotesID = :nid",
+            ExpressionAttributeValues: { ":uid": userId, ":nid": noteId },
+          })
+        );
+        const item = result.Items?.[0];
+        if (!item) {
+          return { statusCode: 404, body: "Note not found" };
         }
-      }));
-      return ok();
+        return { statusCode: 200, body: JSON.stringify(item) };
+      }
+
+      // POST /notes
+      case "POST /notes": {
+        const NotesID = crypto.randomUUID();
+
+        await ddb.send(
+          new PutCommand({
+            TableName: TABLE_NAME,
+            Item: {
+              UserID: userId,
+              NotesID,
+              title: body.title,
+              content: body.content,
+              createdAt: new Date().toISOString(),
+            },
+          })
+        );
+
+        return { statusCode: 201, body: JSON.stringify({ NotesID }) };
+      }
+
+      // PUT /notes/{id}
+      case "PUT /notes/{id}": {
+        await ddb.send(
+          new UpdateCommand({
+            TableName: TABLE_NAME,
+            Key: { UserID: userId, NotesID: noteId },
+            UpdateExpression: "SET title = :t, content = :c",
+            ExpressionAttributeValues: {
+              ":t": body.title,
+              ":c": body.content,
+            },
+          })
+        );
+        return { statusCode: 200, body: "Updated" };
+      }
+
+      // DELETE /notes/{id}
+      case "DELETE /notes/{id}": {
+        await ddb.send(
+          new DeleteCommand({
+            TableName: TABLE_NAME,
+            Key: { UserID: userId, NotesID: noteId },
+          })
+        );
+        return { statusCode: 204 };
+      }
+
+      default:
+        return { statusCode: 405, body: "Route not allowed" };
     }
-
-    if (method === "DELETE") {
-      await client.send(new DeleteItemCommand({
-        TableName: TABLE,
-        Key: { UserID: { S: userId }, noteId: { S: noteId } }
-      }));
-      return ok();
-    }
-
-    return bad("Unsupported method");
-
   } catch (err) {
-    return bad(err.message);
+    console.error(err);
+    return { statusCode: 500, body: "Internal server error" };
   }
 };
-
-const ok = (body = null) => ({
-  statusCode: 200,
-  headers: cors(),
-  body: body ? JSON.stringify(body) : null
-});
-
-const bad = (msg) => ({
-  statusCode: 400,
-  headers: cors(),
-  body: JSON.stringify({ error: msg })
-});
-
-const cors = () => ({
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "*"
-});
